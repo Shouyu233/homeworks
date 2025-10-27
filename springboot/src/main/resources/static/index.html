@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spring Boot REST 示例</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Segoe UI Symbol'; margin: 2rem; }
+    h1 { margin-top: 0; }
+    label { display:block; margin:.5rem 0 .25rem; }
+    input { padding:.4rem; width: 260px; }
+    button { padding:.5rem 1rem; margin-top: .75rem; }
+    pre { background:#f6f8fa; padding:1rem; border:1px solid #eaecef; overflow:auto; }
+    .row { display:flex; gap:2rem; flex-wrap:wrap; }
+    .card { border:1px solid #eaecef; padding:1rem; border-radius:6px; max-width:420px; }
+    a { word-break: break-all; }
+  </style>
+  <script>
+    async function sendJson() {
+      const payload = {
+        name: document.getElementById('name').value || null,
+        age: document.getElementById('age').value ? Number(document.getElementById('age').value) : null,
+        email: document.getElementById('email').value || null
+      };
+      const out = document.getElementById('output');
+      out.textContent = '发送中...';
+      try {
+        const res = await fetch('/api/echo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = '请求失败: ' + e;
+      }
+    }
+  </script>
+  </head>
+  <body>
+    <h1>Spring Boot REST 注解示例</h1>
+    <p>示例涵盖：<code>@RestController</code>、<code>@RequestMapping</code>、<code>@GetMapping</code>、<code>@PostMapping</code>、<code>@PathVariable</code>、<code>@RequestParam</code>、<code>@RequestBody</code>。</p>
+
+    <div class="row">
+      <div class="card">
+        <h2>@RequestParam /hello</h2>
+        <p>GET 示例：根据 <code>name</code> 参数问候。</p>
+        <p>
+          URL：<a href="/api/hello?name=Spring">/api/hello?name=Spring</a>
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>@PathVariable /user/{id}</h2>
+        <p>GET 示例：路径中携带 <code>id</code>。</p>
+        <p>
+          URL：<a href="/api/user/123">/api/user/123</a>
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>@RequestBody /echo</h2>
+        <p>POST 示例：在浏览器输入参数后，以 JSON 方式提交并显示服务器返回。</p>
+        <label for="name">name</label>
+        <input id="name" placeholder="例如：Alice" />
+        <label for="age">age</label>
+        <input id="age" type="number" placeholder="例如：20" />
+        <label for="email">email</label>
+        <input id="email" type="email" placeholder="例如：alice@example.com" />
+        <br/>
+        <button onclick="sendJson()">POST 到 /api/echo</button>
+      </div>
+
+      <div class="card">
+        <h2>支付示例 /api/pay （工厂模式）</h2>
+        <p>选择支付方式并提交模拟支付请求。</p>
+        <label for="pay-method">method</label>
+        <select id="pay-method">
+          <option value="WECHAT">WECHAT</option>
+          <option value="ALIPAY">ALIPAY</option>
+          <option value="CREDIT_CARD">CREDIT_CARD</option>
+        </select>
+        <label for="order-id">orderId</label>
+        <input id="order-id" placeholder="例如：ORDER-1001" />
+        <label for="amount">amount</label>
+        <input id="amount" type="number" step="0.01" placeholder="例如：99.90" />
+        <label for="currency">currency</label>
+        <input id="currency" value="CNY" />
+        <div id="card-extra" style="display:none;margin-top:.5rem;">
+          <label for="card-no">cardNo</label>
+          <input id="card-no" placeholder="4111111111111111" />
+        </div>
+        <div id="wechat-extra" style="display:none;margin-top:.5rem;">
+          <label for="openid">openId</label>
+          <input id="openid" placeholder="用户 openId" />
+        </div>
+        <div id="alipay-extra" style="display:none;margin-top:.5rem;">
+          <label for="alipay-user">alipayUserId</label>
+          <input id="alipay-user" placeholder="支付宝用户ID" />
+        </div>
+        <br/>
+        <button onclick="pay()">POST 到 /api/pay</button>
+      </div>
+    </div>
+
+    <h2>响应输出</h2>
+    <pre id="output">等待请求...</pre>
+
+    <hr/>
+    <p>运行应用后，访问 <a href="/">http://localhost:8080/</a> 打开此页面。</p>
+  <script>
+    const methodSel = document.getElementById('pay-method');
+    methodSel && methodSel.addEventListener('change', () => {
+      const m = methodSel.value;
+      document.getElementById('card-extra').style.display = (m === 'CREDIT_CARD') ? 'block' : 'none';
+      document.getElementById('wechat-extra').style.display = (m === 'WECHAT') ? 'block' : 'none';
+      document.getElementById('alipay-extra').style.display = (m === 'ALIPAY') ? 'block' : 'none';
+    });
+
+    async function pay() {
+      const method = document.getElementById('pay-method').value;
+      const orderId = document.getElementById('order-id').value || null;
+      const amount = document.getElementById('amount').value ? Number(document.getElementById('amount').value) : null;
+      const currency = document.getElementById('currency').value || 'CNY';
+      const extra = {};
+      if (method === 'CREDIT_CARD') {
+        extra.cardNo = document.getElementById('card-no').value || null;
+      } else if (method === 'WECHAT') {
+        extra.openId = document.getElementById('openid').value || null;
+      } else if (method === 'ALIPAY') {
+        extra.alipayUserId = document.getElementById('alipay-user').value || null;
+      }
+      const payload = { method, orderId, amount, currency, extra };
+      const out = document.getElementById('output');
+      out.textContent = '支付请求中...';
+      try {
+        const res = await fetch('/api/pay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = '请求失败: ' + e;
+      }
+    }
+  </script>
+
+  <hr/>
+    <h1>转账与 JDBC 用户管理</h1>
+    <div class="row">
+      <div class="card" style="min-width:420px;">
+        <h2>转账面板</h2>
+        <div>
+          <label>用户 1 (Alice) 余额</label>
+          <div id="bal-1">加载中...</div>
+          <label>用户 2 (Bob) 余额</label>
+          <div id="bal-2">加载中...</div>
+        </div>
+        <hr/>
+        <label for="from-id">From User ID</label>
+        <input id="from-id" value="1" />
+        <label for="to-id">To User ID</label>
+        <input id="to-id" value="2" />
+        <label for="amt">Amount</label>
+        <input id="amt" type="number" step="0.01" value="100.00" />
+        <br/>
+        <button onclick="doTransfer()">执行转账</button>
+        <div id="transfer-result" style="margin-top:.5rem;color:#333"></div>
+      </div>
+    </div>
+  <p>支持两种实现：原始 JDBC 与 JdbcTemplate（通过下拉框选择）。</p>
+
+  <div class="row">
+    <div class="card" style="min-width:520px;">
+      <h2>用户列表</h2>
+      <label for="backend">Backend</label>
+      <select id="backend">
+        <option value="jt" selected>JdbcTemplate</option>
+        <option value="raw">原始JDBC</option>
+      </select>
+      <br/>
+      <button onclick="reloadUsers()">刷新列表</button>
+      <div id="users-area" style="margin-top:1rem;">
+        <em>尚未加载</em>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>新增用户</h2>
+      <label for="new-name">name</label>
+      <input id="new-name" placeholder="例如：张三" />
+      <label for="new-age">age</label>
+      <input id="new-age" type="number" placeholder="例如：30" />
+      <label for="new-email">email</label>
+      <input id="new-email" type="email" placeholder="例如：zhangsan@example.com" />
+      <br/>
+      <button onclick="createUser()">POST /api/users</button>
+      <div id="create-tip"></div>
+    </div>
+
+    <div class="card">
+      <h2>更新用户</h2>
+      <label for="upd-id">id</label>
+      <input id="upd-id" type="number" placeholder="要更新的用户ID" />
+      <label for="upd-name">name</label>
+      <input id="upd-name" placeholder="新名称" />
+      <label for="upd-age">age</label>
+      <input id="upd-age" type="number" placeholder="新年龄（可空）" />
+      <label for="upd-email">email</label>
+      <input id="upd-email" type="email" placeholder="新邮箱（可空）" />
+      <br/>
+      <button onclick="updateUser()">PUT /api/users/{id}</button>
+      <div id="update-tip"></div>
+    </div>
+  </div>
+
+  <script>
+    async function loadBalances() {
+      try {
+        const r1 = await fetch('/api/users/1');
+        const u1 = await r1.json();
+        document.getElementById('bal-1').textContent = u1.balance ?? 'N/A';
+      } catch (e) {
+        document.getElementById('bal-1').textContent = '加载失败';
+      }
+      try {
+        const r2 = await fetch('/api/users/2');
+        const u2 = await r2.json();
+        document.getElementById('bal-2').textContent = u2.balance ?? 'N/A';
+      } catch (e) {
+        document.getElementById('bal-2').textContent = '加载失败';
+      }
+    }
+
+    async function doTransfer() {
+      const from = Number(document.getElementById('from-id').value);
+      const to = Number(document.getElementById('to-id').value);
+      const amount = Number(document.getElementById('amt').value);
+      const resEl = document.getElementById('transfer-result');
+      resEl.textContent = '提交中...';
+      try {
+        const r = await fetch('/api/transfer', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ fromUserId: from, toUserId: to, amount: amount })
+        });
+        if (!r.ok) {
+          const txt = await r.text();
+          resEl.textContent = `失败: ${r.status} ${txt}`;
+        } else {
+          const txt = await r.text();
+          resEl.textContent = '成功: ' + txt;
+        }
+      } catch (e) {
+        resEl.textContent = '请求失败: ' + e;
+      }
+      await loadBalances();
+    }
+
+    // load balances on page load
+    window.addEventListener('load', () => { loadBalances(); });
+
+    function renderUsers(list) {
+      const area = document.getElementById('users-area');
+      if (!list || list.length === 0) {
+        area.innerHTML = '<em>暂无数据</em>';
+        return;
+      }
+      const rows = list.map(u => `
+        <tr>
+          <td>${u.id}</td>
+          <td>${u.name ?? ''}</td>
+          <td>${u.age ?? ''}</td>
+          <td>${u.email ?? ''}</td>
+          <td>${u.createdAt ?? ''}</td>
+          <td>
+            <button onclick="prefill(${u.id}, '${encodeURIComponent(u.name ?? '')}', '${u.age ?? ''}', '${encodeURIComponent(u.email ?? '')}')">编辑</button>
+            <button onclick="deleteUser(${u.id})">删除</button>
+          </td>
+        </tr>`).join('');
+      area.innerHTML = `
+        <table border="1" cellspacing="0" cellpadding="6">
+          <thead>
+            <tr><th>ID</th><th>Name</th><th>Age</th><th>Email</th><th>CreatedAt</th><th>操作</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    function selectedBackend() {
+      return document.getElementById('backend')?.value || 'jt';
+    }
+
+    async function reloadUsers() {
+      const area = document.getElementById('users-area');
+      area.innerHTML = '加载中...';
+      try {
+        const res = await fetch('/api/users?backend=' + selectedBackend());
+        const data = await res.json();
+        renderUsers(data);
+      } catch (e) {
+        area.innerHTML = '加载失败: ' + e;
+      }
+    }
+
+    async function createUser() {
+      const name = document.getElementById('new-name').value;
+      const ageVal = document.getElementById('new-age').value;
+      const email = document.getElementById('new-email').value || null;
+      const age = ageVal ? Number(ageVal) : null;
+      const tip = document.getElementById('create-tip');
+      tip.textContent = '提交中...';
+      try {
+        const res = await fetch('/api/users?backend=' + selectedBackend(), {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name, age, email })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        tip.textContent = '创建成功';
+        document.getElementById('new-name').value='';
+        document.getElementById('new-age').value='';
+        document.getElementById('new-email').value='';
+        reloadUsers();
+      } catch (e) { tip.textContent = '创建失败: ' + e; }
+    }
+
+    function prefill(id, nameEnc, age, emailEnc) {
+      document.getElementById('upd-id').value = id;
+      document.getElementById('upd-name').value = decodeURIComponent(nameEnc);
+      document.getElementById('upd-age').value = age ?? '';
+      document.getElementById('upd-email').value = decodeURIComponent(emailEnc);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    async function updateUser() {
+      const id = document.getElementById('upd-id').value;
+      const name = document.getElementById('upd-name').value;
+      const ageVal = document.getElementById('upd-age').value;
+      const email = document.getElementById('upd-email').value || null;
+      const age = ageVal ? Number(ageVal) : null;
+      const tip = document.getElementById('update-tip');
+      tip.textContent = '提交中...';
+      try {
+        const res = await fetch('/api/users/' + id + '?backend=' + selectedBackend(), {
+          method: 'PUT', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name, age, email })
+        });
+        if (res.status === 404) { tip.textContent = '未找到该ID'; return; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        tip.textContent = '更新成功';
+        reloadUsers();
+      } catch (e) { tip.textContent = '更新失败: ' + e; }
+    }
+
+    async function deleteUser(id) {
+      if (!confirm('确认删除ID=' + id + ' ?')) return;
+      try {
+        const res = await fetch('/api/users/' + id + '?backend=' + selectedBackend(), { method: 'DELETE' });
+        if (res.status === 404) { alert('未找到该ID'); return; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        reloadUsers();
+      } catch (e) { alert('删除失败: ' + e); }
+    }
+
+    // auto load users
+    reloadUsers();
+  </script>
+
+  <hr/>
+  <h1>AOP性能监控面板</h1>
+  <div class="row">
+    <div class="card" style="min-width:500px;">
+      <h2>实时性能统计</h2>
+      <div id="metrics-summary">
+        <em>加载中...</em>
+      </div>
+      <button onclick="loadMetrics()">刷新性能数据</button>
+    </div>
+
+    <div class="card" style="min-width:600px;">
+      <h2>详细性能指标</h2>
+      <div id="metrics-details">
+        <em>加载中...</em>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:1000px;">
+    <h2>AOP功能测试</h2>
+    <p>测试AOP切面的异常处理、日志记录和性能统计功能：</p>
+    
+    <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+      <button onclick="testNormalRequest()">测试正常请求</button>
+      <button onclick="testSlowRequest()">测试慢请求（模拟1秒延迟）</button>
+      <button onclick="testExceptionRequest()">测试异常请求</button>
+      <button onclick="testNullPointerException()">测试空指针异常</button>
+    </div>
+    
+    <div style="margin-top:1rem;">
+      <h3>测试结果：</h3>
+      <pre id="aop-test-result" style="min-height:100px;">等待测试...</pre>
+    </div>
+  </div>
+
+  <script>
+    // 加载性能统计概览
+    async function loadMetrics() {
+      try {
+        const [summaryRes, detailsRes] = await Promise.all([
+          fetch('/api/metrics/summary'),
+          fetch('/api/metrics')
+        ]);
+        
+        const summary = await summaryRes.json();
+        const details = await detailsRes.json();
+        
+        // 更新概览
+        document.getElementById('metrics-summary').innerHTML = `
+          <p><strong>总方法数:</strong> ${summary.totalMethods}</p>
+          <p><strong>总调用次数:</strong> ${summary.totalCalls}</p>
+          <p><strong>总执行时间:</strong> ${summary.totalTime}</p>
+          <p><strong>平均执行时间:</strong> ${summary.overallAverage}</p>
+        `;
+        
+        // 更新详细指标
+        if (details.metrics && Object.keys(details.metrics).length > 0) {
+          let detailsHtml = '<table border="1" cellspacing="0" cellpadding="6" style="width:100%;">';
+          detailsHtml += '<tr><th>方法名</th><th>调用次数</th><th>总耗时</th><th>平均耗时</th><th>最小耗时</th><th>最大耗时</th></tr>';
+          
+          Object.entries(details.metrics).forEach(([methodName, metrics]) => {
+            detailsHtml += `
+              <tr>
+                <td><code>${methodName}</code></td>
+                <td>${metrics.callCount}</td>
+                <td>${metrics.totalTime}ms</td>
+                <td>${metrics.averageTime}</td>
+                <td>${metrics.minTime}</td>
+                <td>${metrics.maxTime}</td>
+              </tr>
+            `;
+          });
+          
+          detailsHtml += '</table>';
+          document.getElementById('metrics-details').innerHTML = detailsHtml;
+        } else {
+          document.getElementById('metrics-details').innerHTML = '<p>暂无性能数据</p>';
+        }
+      } catch (error) {
+        document.getElementById('metrics-summary').innerHTML = '<p style="color:red;">加载失败: ' + error + '</p>';
+        document.getElementById('metrics-details').innerHTML = '<p style="color:red;">加载失败: ' + error + '</p>';
+      }
+    }
+
+    // 测试正常请求
+    async function testNormalRequest() {
+      const resultEl = document.getElementById('aop-test-result');
+      resultEl.textContent = '测试中...';
+      
+      try {
+        const startTime = Date.now();
+        const response = await fetch('/api/hello?name=AOPTest');
+        const endTime = Date.now();
+        const data = await response.json();
+        
+        resultEl.textContent = `✅ 正常请求测试成功\n` +
+          `请求耗时: ${endTime - startTime}ms\n` +
+          `响应数据: ${JSON.stringify(data, null, 2)}\n\n` +
+          `📝 请查看控制台日志确认AOP切面是否记录了方法执行信息`;
+      } catch (error) {
+        resultEl.textContent = `❌ 正常请求测试失败: ${error}`;
+      }
+      
+      // 刷新性能数据
+      setTimeout(loadMetrics, 500);
+    }
+
+    // 测试慢请求
+    async function testSlowRequest() {
+      const resultEl = document.getElementById('aop-test-result');
+      resultEl.textContent = '测试中...';
+      
+      try {
+        const startTime = Date.now();
+        const response = await fetch('/api/user/999?slow=true');
+        const endTime = Date.now();
+        const data = await response.json();
+        
+        resultEl.textContent = `⏱️ 慢请求测试完成\n` +
+          `请求耗时: ${endTime - startTime}ms\n` +
+          `响应数据: ${JSON.stringify(data, null, 2)}\n\n` +
+          `📝 请查看控制台日志确认AOP切面是否记录了慢方法警告`;
+      } catch (error) {
+        resultEl.textContent = `❌ 慢请求测试失败: ${error}`;
+      }
+      
+      // 刷新性能数据
+      setTimeout(loadMetrics, 500);
+    }
+
+    // 测试异常请求
+    async function testExceptionRequest() {
+      const resultEl = document.getElementById('aop-test-result');
+      resultEl.textContent = '测试中...';
+      
+      try {
+        const response = await fetch('/api/user/exception');
+        const data = await response.json();
+        
+        resultEl.textContent = `⚠️ 异常请求测试完成\n` +
+          `HTTP状态码: ${response.status}\n` +
+          `响应数据: ${JSON.stringify(data, null, 2)}\n\n` +
+          `📝 请查看控制台日志确认AOP切面是否记录了异常信息`;
+      } catch (error) {
+        resultEl.textContent = `❌ 异常请求测试失败: ${error}`;
+      }
+      
+      // 刷新性能数据
+      setTimeout(loadMetrics, 500);
+    }
+
+    // 测试空指针异常
+    async function testNullPointerException() {
+      const resultEl = document.getElementById('aop-test-result');
+      resultEl.textContent = '测试中...';
+      
+      try {
+        const response = await fetch('/api/user/null');
+        const data = await response.json();
+        
+        resultEl.textContent = `⚠️ 空指针异常测试完成\n` +
+          `HTTP状态码: ${response.status}\n` +
+          `响应数据: ${JSON.stringify(data, null, 2)}\n\n` +
+          `📝 请查看控制台日志确认AOP切面是否记录了空指针异常信息`;
+      } catch (error) {
+        resultEl.textContent = `❌ 空指针异常测试失败: ${error}`;
+      }
+      
+      // 刷新性能数据
+      setTimeout(loadMetrics, 500);
+    }
+
+    // 页面加载时自动加载性能数据
+    window.addEventListener('load', () => {
+      setTimeout(loadMetrics, 1000);
+    });
+
+    // 每30秒自动刷新性能数据
+    setInterval(loadMetrics, 30000);
+  </script>
+  </body>
+</html>
